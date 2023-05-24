@@ -1,80 +1,102 @@
-// App.js
-
 import React, { useEffect, useState } from "react";
-import io from "socket.io-client";
+import socketIOClient from "socket.io-client";
 
-const socket = io("http://localhost:8080");
+const socket = socketIOClient("http://localhost:8080");
 
 function App() {
   const [chatRooms, setChatRooms] = useState([]);
   const [currentRoom, setCurrentRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
-  const [userName, setUserName] = useState("");
+  const [userId, setuserId] = useState("");
+
   useEffect(() => {
     // Fetch initial chatroom list
-    socket.on("room list updated", (rooms) => {
-      setChatRooms(rooms);
+    socket.on("room list updated", (newRoom) => {
+      setChatRooms((prevRooms) => [...prevRooms, newRoom]);
     });
 
     // Room created event
-    socket.on("room created", (room) => {
-      setChatRooms((prevRooms) => [...prevRooms, room]);
+    socket.on("new room", (room) => {
       setCurrentRoom(room);
-      setMessages([]);
+      setMessages(null);
     });
 
     // Room joined event
     socket.on("room joined", (room) => {
       setCurrentRoom(room);
-      setMessages(room.messages);
+      // axios GET 요청: roomId 로 채팅 불러오기
+      setMessages(room.messages || []);
     });
 
     // Room left event
     socket.on("room left", () => {
       setCurrentRoom(null);
-      setMessages([]);
+      setMessages(null);
     });
 
     // New message event
     socket.on("new message", (message) => {
-      setMessages((prevMessages) => [...prevMessages, message]);
+      setMessages((prevMessages) =>
+        prevMessages ? [...prevMessages, message] : [message]
+      );
     });
 
     return () => {
+      // Clean up event listeners
       socket.off("room list updated");
-      socket.off("room created");
+      socket.off("new room");
       socket.off("room joined");
       socket.off("room left");
       socket.off("new message");
     };
   }, []);
 
-  const handleUserName = () => {
-    const userName = prompt("Enter Your Name: ");
-    setUserName(userName);
+  const handleuserId = () => {
+    const userId = prompt("Enter Your Name: ");
+    setuserId(userId);
   };
 
   const handleCreateRoom = () => {
-    const roomName = prompt("Enter chatroom name:");
-    if (roomName) {
-      socket.emit("create room", roomName);
-    }
+    // Prompt user for room data
+    const locationalCode = prompt("locationalCode");
+    const roomName = prompt("roomName");
+    const maxMember = prompt("maxMember");
+    const hostingMember = prompt("hostingMember");
+    const currentMember = [hostingMember];
+    const deliveryFee = prompt("deliveryFee");
+    const restaurantName = prompt("restaurantName");
+    const meetingTime = prompt("meetingTime");
+    const roomId = Date.now().toString();
+    const roomData = {
+      roomId,
+      locationalCode,
+      roomName,
+      maxMember,
+      currentMember,
+      hostingMember,
+      deliveryFee,
+      restaurantName,
+      meetingTime,
+    };
+
+    socket.emit("create room", roomData);
   };
 
-  const handleJoinRoom = (roomId) => {
-    socket.emit("join room", roomId);
+  const handleJoinRoom = (room) => {
+    socket.emit("join room", room);
   };
 
   const handleLeaveRoom = () => {
-    socket.emit("leave room", currentRoom.roomId);
+    socket.emit("leave room", { roomId: currentRoom.roomId, userId });
   };
 
   const handleSendMessage = () => {
     if (inputMessage) {
       const messageData = {
         roomId: currentRoom.roomId,
-        senderName: userName,
+        senderName: userId,
+        senderId: userId,
         message: inputMessage,
       };
       socket.emit("send message", messageData);
@@ -86,10 +108,10 @@ function App() {
     <div>
       <h1>Chat App</h1>
       <div>
-        {userName === "" ? (
-          <button onClick={handleUserName}>Set User Name</button>
+        {userId === "" ? (
+          <button onClick={handleuserId}>Set User Id</button>
         ) : (
-          <h2>Hello! {userName}</h2>
+          <h2>Hello! {userId}</h2>
         )}
       </div>
       {/* Create Room */}
@@ -106,7 +128,7 @@ function App() {
           <ul>
             {chatRooms.map((room) => (
               <li key={room.roomId}>
-                <button onClick={() => handleJoinRoom(room.roomId)}>
+                <button onClick={() => handleJoinRoom(room)}>
                   {room.roomName}
                 </button>
               </li>
@@ -122,16 +144,18 @@ function App() {
           <button onClick={handleLeaveRoom}>Leave Room</button>
 
           {/* Chat Messages */}
-          <div>
-            <ul>
-              {messages.map((message, index) => (
-                <li key={index}>
-                  <strong>{message.senderName}: </strong>
-                  {message.message}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {messages !== null && (
+            <div>
+              <ul>
+                {messages.map((message, index) => (
+                  <li key={index}>
+                    <strong>{message.senderName}: </strong>
+                    {message.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Chat Input */}
           <div>
