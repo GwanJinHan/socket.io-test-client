@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import socketIOClient from "socket.io-client";
-
-const socket = socketIOClient("https://falling-fire-8326.fly.dev/");
+import axios from "axios";
+const URL = "https://falling-fire-8326.fly.dev";
+const socket = socketIOClient(URL);
 
 function App() {
   const [chatRooms, setChatRooms] = useState([]);
@@ -23,10 +24,14 @@ function App() {
     });
 
     // Room joined event
-    socket.on("room joined", (room) => {
+    socket.on("room joined", async (room) => {
       setCurrentRoom(room);
-      // axios GET 요청: roomId 로 채팅 불러오기
-      setMessages(room.messages || []);
+      let messages;
+      await axios
+        .get(`${URL}/chat/${room.locationalCode}/${room.roomId}/message`)
+        .then((res) => (messages = res.data))
+        .catch((err) => console.error(err));
+      setMessages([...messages] || []);
     });
 
     // Room left event
